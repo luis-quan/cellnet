@@ -14,7 +14,7 @@ func TestGogopbCodec_Codec(t *testing.T) {
 	a.Value = 67994
 	a.Msg = "hello"
 
-	data, meta, err := codec.EncodeMessage(&a)
+	data, meta, err := codec.EncodeMessage(&a, nil)
 	if err != nil {
 		t.Log(err)
 		t.FailNow()

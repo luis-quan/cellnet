@@ -5,7 +5,7 @@
 package test
 
 import (
-	_ "github.com/luis-quan/cellnet"
+	"github.com/luis-quan/cellnet"
 	"github.com/luis-quan/cellnet/codec"
 	_ "github.com/luis-quan/cellnet/codec/gogopb"
 	"reflect"

@@ -3,7 +3,7 @@ package binary
 import (
 	"github.com/luis-quan/cellnet"
 	"github.com/luis-quan/cellnet/codec"
-	"github.com/davyxu/goobjfmt"
+	"github.com/luis-quan/cellnet/serial/binaryserial"
 )
 
 type binaryCodec struct {
@@ -19,13 +19,13 @@ func (self *binaryCodec) MimeType() string {
 
 func (self *binaryCodec) Encode(msgObj interface{}, ctx cellnet.ContextSet) (data interface{}, err error) {
 
-	return goobjfmt.BinaryWrite(msgObj)
+	return binaryserial.BinaryWrite(msgObj)
 
 }
 
 func (self *binaryCodec) Decode(data interface{}, msgObj interface{}) error {
 
-	return goobjfmt.BinaryRead(data.([]byte), msgObj)
+	return binaryserial.BinaryRead(data.([]byte), msgObj)
 }
 
 func init() {

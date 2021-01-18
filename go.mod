@@ -6,7 +6,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davyxu/golexer v0.1.0 // indirect
 	github.com/davyxu/golog v0.1.0
-	github.com/davyxu/goobjfmt v0.1.0
 	github.com/davyxu/pbmeta v0.0.0-20190820093316-20fa09595e0e
 	github.com/davyxu/protoplus v0.1.0
 	github.com/go-sql-driver/mysql v1.5.0

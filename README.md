@@ -60,10 +60,6 @@ cellnet经过多个版本的迭代，无论是作为初学者学习的范例，�
     - json
         适合与第三方服务器通信
 
-    - 二进制协议(https://github.com/davyxu/goobjfmt)
-
-       内存流直接序列化, 适用于服务器内网传输
-
     - ProtoPlus(https://github.com/davyxu/protoplus)
 
        增加并优化过的Protobuf的编码格式
@@ -115,8 +111,6 @@ cellnet经过多个版本的迭代，无论是作为初学者学习的范例，�
   go get -u -v github.com/davyxu/cellnet
 
   go get -u -v github.com/davyxu/golog
-
-  go get -u -v github.com/davyxu/goobjfmt
 
   go get -u -v github.com/davyxu/protoplus
 ```

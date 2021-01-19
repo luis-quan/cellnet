@@ -19,13 +19,13 @@ func (self *binaryCodec) MimeType() string {
 
 func (self *binaryCodec) Encode(msgObj interface{}, ctx cellnet.ContextSet) (data interface{}, err error) {
 
-	return binaryserial.BinaryWrite(msgObj)
+	return binaryserial.BinaryWrite(msgObj, 4)
 
 }
 
 func (self *binaryCodec) Decode(data interface{}, msgObj interface{}) error {
 
-	return binaryserial.BinaryRead(data.([]byte), msgObj)
+	return binaryserial.BinaryRead(data.([]byte), msgObj, 4)
 }
 
 func init() {

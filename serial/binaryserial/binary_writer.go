@@ -11,11 +11,11 @@ var (
 	ErrOutOfData   = errors.New("out of data")
 )
 
-func BinaryWrite(obj interface{}) ([]byte, error) {
+func BinaryWrite(obj interface{}, alignMax int8) ([]byte, error) {
 
 	// Fallback to reflect-based encoding.
 	v := reflect.Indirect(reflect.ValueOf(obj))
-	size := dataSize(v, nil)
+	size := dataSize(v, alignMax)
 	if size < 0 {
 		return nil, ErrInvalidType
 	}
@@ -23,7 +23,7 @@ func BinaryWrite(obj interface{}) ([]byte, error) {
 	buf := make([]byte, size)
 
 	e := &encoder{order: binary.LittleEndian, buf: buf}
-	e.value(v)
+	e.value(v, alignMax)
 
 	return buf, nil
 }

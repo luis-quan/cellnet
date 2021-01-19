@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-func BinaryRead(data []byte, obj interface{}) error {
+func BinaryRead(data []byte, obj interface{}, alignMax int8) error {
 
 	if len(data) == 0 {
 		return nil
@@ -19,7 +19,7 @@ func BinaryRead(data []byte, obj interface{}) error {
 		v = v.Elem()
 	}
 
-	size := dataSize(v, nil)
+	size := dataSize(v, alignMax)
 	if size < 0 {
 		return ErrInvalidType
 	}
@@ -31,7 +31,7 @@ func BinaryRead(data []byte, obj interface{}) error {
 	fmt.Println(len(data), size)
 
 	d := &decoder{order: binary.LittleEndian, buf: data}
-	d.value(v)
+	d.value(v, alignMax)
 
 	return nil
 }

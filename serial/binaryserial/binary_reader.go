@@ -19,7 +19,7 @@ func BinaryRead(data []byte, obj interface{}, alignMax int8) error {
 		v = v.Elem()
 	}
 
-	size := dataSize(v, alignMax)
+	size := dataSize(v, v, alignMax)
 	if size < 0 {
 		return ErrInvalidType
 	}
@@ -31,7 +31,7 @@ func BinaryRead(data []byte, obj interface{}, alignMax int8) error {
 	fmt.Println(len(data), size)
 
 	d := &decoder{order: binary.LittleEndian, buf: data}
-	d.value(v, alignMax)
+	d.value(v, v, alignMax)
 
 	return nil
 }

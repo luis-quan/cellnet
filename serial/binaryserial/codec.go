@@ -124,7 +124,8 @@ func (bigEndian) GoString() string { return "binary.BigEndian" }
 // must be a fixed-size value or a slice of fixed-size values, or a pointer to such data.
 // If v is neither of these, Size returns -1.
 func Size(v interface{}, alignMax int8) int {
-	return dataSize(reflect.Indirect(reflect.ValueOf(v)), alignMax)
+	vv := reflect.Indirect(reflect.ValueOf(v))
+	return dataSize(vv, vv, alignMax)
 }
 
 var structSize sync.Map // map[reflect.Type]int
@@ -172,13 +173,59 @@ func alignSize(t reflect.Type, alignMax int8) int8 {
 // it returns the length of the slice times the element size and does not count the memory
 // occupied by the header. If the type of v is not acceptable, dataSize returns -1.
 // alignMax对齐补齐
-func dataSize(v reflect.Value, alignMax int8) int {
+
+/*
+	type S struct {
+		SliceLen int `slicefrom:SliceName`
+		SliceName []int
+	}
+*/
+
+func getSliceLen(v reflect.Value, slicename string) int {
 	switch v.Kind() {
-	case reflect.Slice, reflect.Array:
+	case reflect.Struct:
+		t := v.Type()
+		for i, n := 0, t.NumField(); i < n; i++ {
+			field := t.Field(i)
+			slicefrom := field.Tag.Get("slicefrom")
+			if slicefrom == slicename {
+				switch field.Type.Kind() {
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					return int(v.Field(i).Int())
+				case reflect.Struct:
+					return getSliceLen(v.Field(i), slicename)
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+func dataSize(ov reflect.Value, v reflect.Value, alignMax int8) int {
+	switch v.Kind() {
+	case reflect.Array:
 		l := v.Len()
 		size := 0
 		if l > 0 {
-			size = dataSize(v.Index(0), alignMax)
+			size = dataSize(ov, v.Index(0), alignMax)
+		}
+
+		align := alignSize(v.Type(), alignMax)
+		size = alignFunc(size, align)
+		return size * l
+	case reflect.Slice:
+		l := getSliceLen(ov, v.Type().Name())
+		size := 0
+		if l > 0 {
+			if v.Len() <= 0 {
+				//创建一个大小的
+				vv := reflect.New(v.Type().Elem())
+				vv = reflect.Indirect(vv)
+				size = dataSize(v, vv, alignMax)
+			} else {
+				size = dataSize(v, v.Index(0), alignMax)
+			}
 		}
 
 		align := alignSize(v.Type(), alignMax)
@@ -186,12 +233,12 @@ func dataSize(v reflect.Value, alignMax int8) int {
 		return size * l
 	case reflect.Struct:
 		t := v.Type()
-		if size, ok := structSize.Load(t); ok {
-			return size.(int)
-		}
+		// if size, ok := structSize.Load(t); ok {
+		// 	return size.(int)
+		// }
 		size := 0
 		for i, n := 0, t.NumField(); i < n; i++ {
-			s := dataSize(v.Field(i), alignMax)
+			s := dataSize(v, v.Field(i), alignMax)
 			if s < 0 {
 				return -1
 			}
@@ -201,7 +248,7 @@ func dataSize(v reflect.Value, alignMax int8) int {
 		}
 		align := alignSize(t, alignMax)
 		size = alignFunc(size, align)
-		structSize.Store(t, size)
+		//structSize.Store(t, size)
 		//结构体需要补齐
 		return size
 	default:
@@ -307,7 +354,20 @@ func (d *decoder) int64() int64 { return int64(d.uint64()) }
 
 func (e *encoder) int64(x int64) { e.uint64(uint64(x)) }
 
-func (d *decoder) value(v reflect.Value, alignMax int8) {
+func (d *decoder) valueslice(l int, v reflect.Value, alignMax int8) {
+	for i := 0; i < l; i++ {
+		if i >= v.Len() {
+			//插入新的对象
+			v1 := reflect.Append(v, reflect.New(v.Type().Elem()).Elem())
+			v.Set(v1)
+			d.value(v, v.Index(i), alignMax)
+		} else {
+			d.value(v, v.Index(i), alignMax)
+		}
+	}
+}
+
+func (d *decoder) value(ov reflect.Value, v reflect.Value, alignMax int8) {
 	align := alignSize(v.Type(), alignMax)
 	d.offset = alignFunc(d.offset, align)
 
@@ -315,33 +375,46 @@ func (d *decoder) value(v reflect.Value, alignMax int8) {
 	case reflect.Array:
 		l := v.Len()
 		for i := 0; i < l; i++ {
-			d.value(v.Index(i), alignMax)
+			d.value(v, v.Index(i), alignMax)
 		}
 	case reflect.Struct:
 		t := v.Type()
 		l := v.NumField()
-		for i := 0; i < l; i++ {
-			// Note: Calling v.CanSet() below is an optimization.
-			// It would be sufficient to check the field name,
-			// but creating the StructField info for each field is
-			// costly (run "go test -bench=ReadStruct" and compare
-			// results when making changes to this code).
-			if v := v.Field(i); v.CanSet() || t.Field(i).Name != "_" {
-				d.value(v, alignMax)
-			} else {
-				d.skip(v, alignMax)
+		/*
+			type ss struct {
+				aa []int
+			}
+		*/
+		//如果第一次 并且只有一个切片 就先获取单个切片的大小切片 更加大小来取
+		if ov == v && l == 1 && t.Field(0).Type.Kind() == reflect.Slice {
+			v = v.Field(0)
+			if v.CanSet() || t.Field(0).Name != "_" {
+				vv := reflect.New(v.Type().Elem())
+				vv = reflect.Indirect(vv)
+				size := dataSize(v, vv, alignMax)
+				l = len(d.buf) / size
+				d.valueslice(l, v, alignMax)
+			}
+		} else {
+			ov = v
+			for i := 0; i < l; i++ {
+				// Note: Calling v.CanSet() below is an optimization.
+				// It would be sufficient to check the field name,
+				// but creating the StructField info for each field is
+				// costly (run "go test -bench=ReadStruct" and compare
+				// results when making changes to this code).
+				if v := v.Field(i); v.CanSet() || t.Field(i).Name != "_" {
+					d.value(ov, v, alignMax)
+				} else {
+					d.skip(ov, v, alignMax)
+				}
 			}
 		}
-
 	case reflect.Slice:
-		l := v.Len()
-		for i := 0; i < l; i++ {
-			d.value(v.Index(i), alignMax)
-		}
-
+		l := getSliceLen(ov, v.Type().Name())
+		d.valueslice(l, v, alignMax)
 	case reflect.Bool:
 		v.SetBool(d.bool())
-
 	case reflect.Int8:
 		v.SetInt(int64(d.int8()))
 	case reflect.Int16:
@@ -378,7 +451,20 @@ func (d *decoder) value(v reflect.Value, alignMax int8) {
 	}
 }
 
-func (e *encoder) value(v reflect.Value, alignMax int8) {
+func (e *encoder) valueslice(l int, v reflect.Value, alignMax int8) {
+	for i := 0; i < l; i++ {
+		if i >= v.Len() {
+			//插入新的对象
+			v1 := reflect.Append(v, reflect.New(v.Type().Elem()).Elem())
+			v.Set(v1)
+			e.value(v, v.Index(i), alignMax)
+		} else {
+			e.value(v, v.Index(i), alignMax)
+		}
+	}
+}
+
+func (e *encoder) value(ov reflect.Value, v reflect.Value, alignMax int8) {
 	align := alignSize(v.Type(), alignMax)
 	e.offset = alignFunc(e.offset, align)
 
@@ -386,26 +472,37 @@ func (e *encoder) value(v reflect.Value, alignMax int8) {
 	case reflect.Array:
 		l := v.Len()
 		for i := 0; i < l; i++ {
-			e.value(v.Index(i), alignMax)
+			e.value(v, v.Index(i), alignMax)
 		}
 
 	case reflect.Struct:
 		t := v.Type()
 		l := v.NumField()
-		for i := 0; i < l; i++ {
-			// see comment for corresponding code in decoder.value()
-			if v := v.Field(i); v.CanSet() || t.Field(i).Name != "_" {
-				e.value(v, alignMax)
-			} else {
-				e.skip(v, alignMax)
+
+		//如果第一次 并且只有一个切片 就先获取单个切片的大小切片 更加大小来取
+		if ov == v && l == 1 && t.Field(0).Type.Kind() == reflect.Slice {
+			v = v.Field(0)
+			if v.CanSet() || t.Field(0).Name != "_" {
+				vv := reflect.New(v.Type().Elem())
+				vv = reflect.Indirect(vv)
+				size := dataSize(v, vv, alignMax)
+				l = len(e.buf) / size
+				e.valueslice(l, v, alignMax)
+			}
+		} else {
+			for i := 0; i < l; i++ {
+				// see comment for corresponding code in decoder.value()
+				if v := v.Field(i); v.CanSet() || t.Field(i).Name != "_" {
+					e.value(ov, v, alignMax)
+				} else {
+					e.skip(ov, v, alignMax)
+				}
 			}
 		}
 
 	case reflect.Slice:
-		l := v.Len()
-		for i := 0; i < l; i++ {
-			e.value(v.Index(i), alignMax)
-		}
+		l := getSliceLen(ov, v.Type().Name())
+		e.valueslice(l, v, alignMax)
 
 	case reflect.Bool:
 		e.bool(v.Bool())
@@ -456,13 +553,13 @@ func (e *encoder) value(v reflect.Value, alignMax int8) {
 	}
 }
 
-func (d *decoder) skip(v reflect.Value, alignMax int8) {
-	size := dataSize(v, alignMax)
+func (d *decoder) skip(ov reflect.Value, v reflect.Value, alignMax int8) {
+	size := dataSize(ov, v, alignMax)
 	d.offset += size
 }
 
-func (e *encoder) skip(v reflect.Value, alignMax int8) {
-	n := dataSize(v, alignMax)
+func (e *encoder) skip(ov reflect.Value, v reflect.Value, alignMax int8) {
+	n := dataSize(ov, v, alignMax)
 	zero := e.buf[e.offset : e.offset+n]
 	for i := range zero {
 		zero[i] = 0

@@ -24,13 +24,13 @@ func encodeHeader(data []byte, id uint16) {
 	offset += 1
 	data[offset] = uint8(0) //encode
 	offset += 1
-	binary.LittleEndian.PutUint16(data[offset:1], 0) //length
+	binary.LittleEndian.PutUint16(data[offset:offset+2], 0) //length
 	offset += 2
 	data[offset] = uint8(0x03) //version
 	offset += 1
 	data[offset] = uint8(0) //reserve
 	offset += 1
-	binary.LittleEndian.PutUint16(data[offset:1], id) //utype
+	binary.LittleEndian.PutUint16(data[offset:offset+2], id) //utype
 	offset += 2
 }
 

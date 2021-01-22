@@ -114,7 +114,7 @@ func (WSMessageTransmitter) OnSendMessage(ses cellnet.Session, msg interface{}) 
 	encodeHeader(pkt, uint16(msgID))
 	copy(pkt[MsgIDSize:], msgData)
 
-	conn.WriteMessage(websocket.BinaryMessage, msgData)
+	conn.WriteMessage(websocket.BinaryMessage, pkt)
 
 	return nil
 }

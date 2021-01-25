@@ -1,6 +1,7 @@
-![cellnetlogo](doc/logo.png)
+# 本文网络层是cellnet框架 稍作修改 非常感谢原作者
+# 为了兼容c++服务器 二进制结构体字节对齐 加了结构体序列化操作
+# cellnet callback函数添加了裸包回调，具体解包可回调到 回调函数里面自行解包(只改了gorillaws 可能违背了作者初衷但是这边需求需要改动)
 
- [![Build Status][3]][4] [![Go Report Card][5]][6] [![MIT licensed][11]][12] [![GoDoc][1]][2]
 
 [1]: https://godoc.org/github.com/davyxu/cellnet?status.svg
 [2]: https://godoc.org/github.com/davyxu/cellnet
